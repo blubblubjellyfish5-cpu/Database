@@ -500,6 +500,66 @@
     <button class="leaf-popup-close" onclick="leafClosePopup()">Close</button>
   </div>
 </div>
+
+ <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  (function () {
+    const SUPABASE_URL = 'https://jpmnelsiltgrtjmhpixy.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpwbW5lbHNpbHRncnRqbWhwaXh5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM3NDkwOTAsImV4cCI6MjA4OTMyNTA5MH0.MKgf_963FuYykq9NsLVUr-0I3_y9guMdWcKRf_K_vCo';
+
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    window.leafSendMessage = async function () {
+      const nameEl  = document.getElementById('leaf-name');
+      const msgEl   = document.getElementById('leaf-msg');
+      const btn     = document.getElementById('leaf-send-btn');
+      const errEl   = document.getElementById('leaf-error');
+
+      const name    = nameEl.value.trim();
+      const message = msgEl.value.trim();
+
+      errEl.style.display = 'none';
+
+      if (!name || !message) {
+        errEl.textContent = 'Please fill in both fields.';
+        errEl.style.display = 'block';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Sending…';
+
+      const { error } = await sb.from('Messages').insert([{ name, message }]);
+
+      if (error) {
+        errEl.textContent = 'Something went wrong. Please try again.';
+        errEl.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Send ✦';
+        return;
+      }
+
+      // Reset form
+      nameEl.value = '';
+      msgEl.value  = '';
+      btn.disabled = false;
+      btn.textContent = 'Send ✦';
+
+      // Show popup
+      document.getElementById('leaf-popup-overlay').classList.add('active');
+    };
+
+    window.leafClosePopup = function () {
+      document.getElementById('leaf-popup-overlay').classList.remove('active');
+    };
+
+    // Close on overlay click
+    document.getElementById('leaf-popup-overlay').addEventListener('click', function (e) {
+      if (e.target === this) leafClosePopup();
+    });
+  })();
+</script>
+<!-- ════════════════ END LEAF MESSAGE CARD ════════════════ -->
     
 </body>
 </html>
