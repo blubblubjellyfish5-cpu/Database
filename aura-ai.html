@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aura AI</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #130a04;
+    --glass-bg: rgba(255, 180, 80, 0.06);
+    --glass-border: rgba(255, 190, 100, 0.14);
+    --glass-hover: rgba(255, 190, 100, 0.1);
+    --amber: #f5a623;
+    --amber-soft: rgba(245, 166, 35, 0.25);
+    --amber-glow: rgba(245, 130, 20, 0.5);
+    --user-bubble: rgba(245, 140, 30, 0.18);
+    --ai-bubble: rgba(255, 255, 255, 0.06);
+    --text: #f5e8d0;
+    --text-muted: rgba(245, 232, 208, 0.45);
+    --accent: #ff8c30;
+    --red: #ff5050;
+  }
+
+  body {
+    min-height: 100vh;
+    background: var(--bg);
+    font-family: 'DM Sans', sans-serif;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* Warm bokeh background */
+  .bg-orbs {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    overflow: hidden;
+  }
+  .orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(80px);
+    opacity: 0.35;
+    animation: orbFloat 8s ease-in-out infinite;
+  }
+  .orb1 { width: 500px; height: 400px; background: radial-gradient(circle, #ff7a00, transparent 70%); top: -100px; right: -100px; animation-delay: 0s; }
+  .orb2 { width: 400px; height: 500px; background: radial-gradient(circle, #c94c00, transparent 70%); bottom: -150px; left: -100px; animation-delay: 3s; }
+  .orb3 { width: 300px; height: 300px; background: radial-gradient(circle, #ff9f40, transparent 70%); top: 50%; left: 50%; transform: translate(-50%, -50%); animation-delay: 6s; opacity: 0.18; }
+  .grain {
+    position: fixed; inset: 0; z-index: 1; pointer-events: none; opacity: 0.04;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
+  }
+
+  @keyframes orbFloat {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50% { transform: translateY(-30px) scale(1.05); }
+  }
+
+  /* App shell */
+  .app {
+    position: relative;
+    z-index: 10;
+    width: 420px;
+    height: 88vh;
+    max-height: 820px;
+    background: rgba(255, 175, 70, 0.05);
+    backdrop-filter: blur(32px) saturate(160%);
+    -webkit-backdrop-filter: blur(32px) saturate(160%);
+    border: 1px solid var(--glass-border);
+    border-radius: 32px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 32px 80px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,200,100,0.12);
+  }
+
+  /* Header */
+  .header {
+    padding: 22px 24px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--glass-border);
+    flex-shrink: 0;
+  }
+  .header-left { display: flex; flex-direction: column; }
+  .app-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 26px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    background: linear-gradient(135deg, #ffd580, #ff8c30);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 1;
+  }
+  .app-sub {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 300;
+    letter-spacing: 0.08em;
+    margin-top: 4px;
+    text-transform: uppercase;
+  }
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #4ade80;
+    box-shadow: 0 0 8px #4ade80;
+    display: inline-block;
+    margin-right: 6px;
+    animation: pulse 2s ease infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
+  .header-right { display: flex; gap: 10px; align-items: center; }
+  .icon-btn {
+    width: 36px; height: 36px;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: all 0.2s; color: var(--text-muted);
+    font-size: 15px;
+  }
+  .icon-btn:hover { background: var(--glass-hover); color: var(--text); border-color: var(--amber); }
+
+  /* Mode bar */
+  .mode-bar {
+    display: flex;
+    gap: 6px;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--glass-border);
+    flex-shrink: 0;
+  }
+  .mode-btn {
+    flex: 1;
+    padding: 8px 6px;
+    border-radius: 14px;
+    border: 1px solid var(--glass-border);
+    background: transparent;
+    color: var(--text-muted);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 400;
+    cursor: pointer;
+    transition: all 0.25s;
+    display: flex; align-items: center; justify-content: center; gap: 5px;
+    white-space: nowrap;
+  }
+  .mode-btn.active {
+    background: linear-gradient(135deg, rgba(245, 130, 20, 0.3), rgba(255, 100, 10, 0.2));
+    border-color: var(--amber);
+    color: #ffd580;
+    box-shadow: 0 0 16px rgba(245, 130, 20, 0.2);
+  }
+  .mode-btn:hover:not(.active) { background: var(--glass-hover); color: var(--text); }
+
+  /* Chat area */
+  .chat-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    scroll-behavior: smooth;
+  }
+  .chat-area::-webkit-scrollbar { width: 3px; }
+  .chat-area::-webkit-scrollbar-track { background: transparent; }
+  .chat-area::-webkit-scrollbar-thumb { background: var(--glass-border); border-radius: 2px; }
+
+  /* Messages */
+  .msg {
+    display: flex;
+    flex-direction: column;
+    max-width: 82%;
+    animation: msgIn 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  @keyframes msgIn {
+    from { opacity: 0; transform: translateY(10px) scale(0.96); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .msg.user { align-self: flex-end; align-items: flex-end; }
+  .msg.ai { align-self: flex-start; align-items: flex-start; }
+
+  .bubble {
+    padding: 12px 16px;
+    border-radius: 20px;
+    font-size: 14px;
+    line-height: 1.55;
+    font-weight: 300;
+  }
+  .msg.user .bubble {
+    background: linear-gradient(135deg, rgba(245, 140, 30, 0.28), rgba(255, 100, 20, 0.18));
+    border: 1px solid rgba(245, 166, 35, 0.3);
+    border-bottom-right-radius: 6px;
+    color: #ffe8c0;
+  }
+  .msg.ai .bubble {
+    background: var(--ai-bubble);
+    border: 1px solid var(--glass-border);
+    border-bottom-left-radius: 6px;
+    color: var(--text);
+  }
+  .msg-meta {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin: 3px 6px 0;
+    letter-spacing: 0.03em;
+  }
+  .voice-label {
+    font-size: 10px;
+    color: var(--amber);
+    margin: 2px 6px 0;
+    display: flex; align-items: center; gap: 3px;
+    opacity: 0.7;
+  }
+
+  /* Typing indicator */
+  .typing-bubble {
+    display: flex; gap: 5px; align-items: center;
+    padding: 14px 18px;
+    background: var(--ai-bubble);
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    border-bottom-left-radius: 6px;
+    width: fit-content;
+  }
+  .dot-pulse { width: 6px; height: 6px; border-radius: 50%; background: var(--amber); animation: dotPulse 1.4s ease-in-out infinite; }
+  .dot-pulse:nth-child(2) { animation-delay: 0.2s; }
+  .dot-pulse:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes dotPulse { 0%,80%,100%{opacity:0.2;transform:scale(0.8);} 40%{opacity:1;transform:scale(1);} }
+
+  /* Welcome */
+  .welcome {
+    text-align: center;
+    margin: auto;
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+    padding: 20px;
+  }
+  .welcome-orb {
+    width: 70px; height: 70px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #ffd580, #ff6a00);
+    box-shadow: 0 0 40px rgba(255, 140, 30, 0.5), 0 0 80px rgba(255, 100, 10, 0.25);
+    animation: orbPulse 3s ease-in-out infinite;
+    margin-bottom: 6px;
+  }
+  @keyframes orbPulse {
+    0%,100%{box-shadow:0 0 40px rgba(255,140,30,0.5),0 0 80px rgba(255,100,10,0.25);}
+    50%{box-shadow:0 0 60px rgba(255,140,30,0.7),0 0 100px rgba(255,100,10,0.4);}
+  }
+  .welcome h2 { font-family:'Cormorant Garamond',serif; font-size:22px; font-weight:400; color:#ffd580; }
+  .welcome p { font-size:13px; color:var(--text-muted); font-weight:300; line-height:1.5; max-width:240px; }
+
+  /* Bottom area */
+  .bottom-area {
+    padding: 14px 18px 20px;
+    border-top: 1px solid var(--glass-border);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+
+  /* Text input row */
+  .text-row {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+  }
+  .text-input {
+    flex: 1;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 18px;
+    padding: 12px 16px;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 300;
+    resize: none;
+    outline: none;
+    max-height: 100px;
+    min-height: 44px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    line-height: 1.5;
+  }
+  .text-input::placeholder { color: var(--text-muted); }
+  .text-input:focus { border-color: rgba(245, 166, 35, 0.5); box-shadow: 0 0 16px rgba(245, 130, 20, 0.12); }
+
+  .send-btn {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #ff8c30, #f5a623);
+    border: none;
+    color: #1a0800;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s;
+    flex-shrink: 0;
+    box-shadow: 0 4px 16px rgba(245, 130, 20, 0.35);
+  }
+  .send-btn:hover { transform: scale(1.08); box-shadow: 0 6px 20px rgba(245, 130, 20, 0.5); }
+  .send-btn:active { transform: scale(0.96); }
+  .send-btn:disabled { opacity: 0.4; transform: none; cursor: not-allowed; }
+
+  /* PTT button */
+  .ptt-row { display: flex; justify-content: center; }
+  .ptt-btn {
+    padding: 13px 36px;
+    border-radius: 50px;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    color: var(--text-muted);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 400;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 8px;
+    transition: all 0.2s;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
+  }
+  .ptt-btn:hover { background: var(--glass-hover); border-color: var(--amber); color: var(--text); }
+  .ptt-btn.recording {
+    background: linear-gradient(135deg, rgba(255,50,50,0.2), rgba(200,0,0,0.15));
+    border-color: #ff5050;
+    color: #ff8080;
+    box-shadow: 0 0 24px rgba(255, 50, 50, 0.3);
+    animation: recordPulse 1s ease infinite;
+  }
+  @keyframes recordPulse {
+    0%,100%{box-shadow:0 0 24px rgba(255,50,50,0.3);}
+    50%{box-shadow:0 0 40px rgba(255,50,50,0.5);}
+  }
+  .mic-icon { font-size: 16px; }
+  .ptt-text { font-size: 12px; }
+
+  /* Settings panel */
+  .settings-overlay {
+    position: absolute; inset: 0; z-index: 50;
+    background: rgba(10, 5, 0, 0.7);
+    backdrop-filter: blur(6px);
+    display: none;
+  }
+  .settings-overlay.open { display: flex; align-items: flex-end; animation: fadeIn 0.2s; }
+  @keyframes fadeIn { from{opacity:0;} to{opacity:1;} }
+  .settings-panel {
+    width: 100%; padding: 28px 24px 32px;
+    background: rgba(30, 14, 4, 0.95);
+    border-top: 1px solid var(--glass-border);
+    border-radius: 28px 28px 0 0;
+    display: flex; flex-direction: column; gap: 18px;
+    animation: slideUp 0.3s cubic-bezier(0.34,1.2,0.64,1);
+  }
+  @keyframes slideUp { from{transform:translateY(30px);opacity:0;} to{transform:translateY(0);opacity:1;} }
+  .settings-title { font-family:'Cormorant Garamond',serif; font-size:20px; color:#ffd580; font-weight:400; }
+  .setting-group { display: flex; flex-direction: column; gap: 7px; }
+  .setting-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; }
+  .setting-input {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 11px 14px;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    outline: none;
+    width: 100%;
+    transition: border-color 0.2s;
+  }
+  .setting-input:focus { border-color: var(--amber); }
+  select.setting-input option { background: #1c0d06; }
+  .save-btn {
+    padding: 12px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #ff8c30, #f5a623);
+    border: none;
+    color: #1a0800;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 500;
+    font-size: 14px;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  .save-btn:hover { opacity: 0.88; }
+
+  /* Hide utilities */
+  .hidden { display: none !important; }
+
+  /* Responsive */
+  @media (max-width: 480px) {
+    body { align-items: flex-end; }
+    .app { width: 100vw; height: 100vh; max-height: 100vh; border-radius: 0; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Background -->
+<div class="bg-orbs">
+  <div class="orb orb1"></div>
+  <div class="orb orb2"></div>
+  <div class="orb orb3"></div>
+</div>
+<div class="grain"></div>
+
+<!-- App -->
+<div class="app">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <span class="app-name">Aura AI</span>
+      <span class="app-sub"><span class="status-dot"></span>Online</span>
+    </div>
+    <div class="header-right">
+      <button class="icon-btn" onclick="clearChat()" title="Clear chat">🗑</button>
+      <button class="icon-btn" onclick="openSettings()" title="Settings">⚙️</button>
+    </div>
+  </div>
+
+  <!-- Mode bar -->
+  <div class="mode-bar">
+    <button class="mode-btn active" data-mode="text" onclick="setMode('text')">💬 Text</button>
+    <button class="mode-btn" data-mode="voice" onclick="setMode('voice')">🎙️ Voice</button>
+    <button class="mode-btn" data-mode="both" onclick="setMode('both')">🔀 Both</button>
+  </div>
+
+  <!-- Chat area -->
+  <div class="chat-area" id="chatArea">
+    <div class="welcome" id="welcome">
+      <div class="welcome-orb"></div>
+      <h2>Hi, I'm Aura</h2>
+      <p>Your intelligent companion. Type a message or hold the mic button to talk.</p>
+    </div>
+  </div>
+
+  <!-- Bottom -->
+  <div class="bottom-area">
+    <!-- Text input row -->
+    <div class="text-row" id="textRow">
+      <textarea class="text-input" id="textInput" placeholder="Say something..." rows="1"
+        onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+      <button class="send-btn" id="sendBtn" onclick="handleSend()">➤</button>
+    </div>
+    <!-- PTT row -->
+    <div class="ptt-row" id="pttRow" style="display:none">
+      <button class="ptt-btn" id="pttBtn"
+        onmousedown="startPTT()" onmouseup="stopPTT()"
+        ontouchstart="startPTT(event)" ontouchend="stopPTT(event)">
+        <span class="mic-icon">🎤</span>
+        <span class="ptt-text" id="pttText">Hold to speak</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Settings overlay -->
+  <div class="settings-overlay" id="settingsOverlay" onclick="closeSettingsOnBg(event)">
+    <div class="settings-panel">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span class="settings-title">Settings</span>
+        <button class="icon-btn" onclick="closeSettings()">✕</button>
+      </div>
+
+      <div class="setting-group">
+        <label class="setting-label">Groq API Key</label>
+        <input class="setting-input" id="apiKeyInput" type="password" placeholder="gsk_..." />
+      </div>
+
+      <div class="setting-group">
+        <label class="setting-label">AI Persona</label>
+        <input class="setting-input" id="personaInput" type="text" placeholder="Friendly and smart assistant" />
+      </div>
+
+      <div class="setting-group">
+        <label class="setting-label">AI Model</label>
+        <select class="setting-input" id="modelSelect">
+          <option value="llama-3.3-70b-versatile">Llama 3.3 70B (Best)</option>
+          <option value="llama3-8b-8192">Llama 3 8B (Fast)</option>
+          <option value="mixtral-8x7b-32768">Mixtral 8x7B</option>
+        </select>
+      </div>
+
+      <div class="setting-group">
+        <label class="setting-label">Voice (TTS)</label>
+        <select class="setting-input" id="voiceSelect"></select>
+      </div>
+
+      <button class="save-btn" onclick="saveSettings()">Save Settings</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── State ────────────────────────────────────────────
+let apiKey = localStorage.getItem('aura_apikey') || '';
+let persona = localStorage.getItem('aura_persona') || 'You are Aura, a warm, intelligent, and concise AI assistant. Be natural, friendly, and helpful.';
+let model   = localStorage.getItem('aura_model') || 'llama-3.3-70b-versatile';
+let selectedVoiceName = localStorage.getItem('aura_voice') || '';
+let currentMode = 'text'; // 'text' | 'voice' | 'both'
+let history = []; // {role, content}
+let isLoading = false;
+let isRecording = false;
+let mediaRecorder = null;
+let audioChunks = [];
+let micStream = null;
+
+// ── Init ────────────────────────────────────────────
+window.onload = () => {
+  populateVoices();
+  window.speechSynthesis.onvoiceschanged = populateVoices;
+  document.getElementById('apiKeyInput').value = apiKey;
+  document.getElementById('personaInput').value = persona;
+  document.getElementById('modelSelect').value = model;
+};
+
+// ── Mode ────────────────────────────────────────────
+function setMode(mode) {
+  currentMode = mode;
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector(`[data-mode="${mode}"]`).classList.add('active');
+
+  const textRow = document.getElementById('textRow');
+  const pttRow  = document.getElementById('pttRow');
+
+  if (mode === 'text') {
+    textRow.style.display = 'flex';
+    pttRow.style.display  = 'none';
+  } else if (mode === 'voice') {
+    textRow.style.display = 'none';
+    pttRow.style.display  = 'flex';
+  } else { // both
+    textRow.style.display = 'flex';
+    pttRow.style.display  = 'flex';
+  }
+}
+
+// ── Settings ────────────────────────────────────────
+function openSettings() {
+  document.getElementById('settingsOverlay').classList.add('open');
+  document.getElementById('apiKeyInput').value = apiKey;
+  document.getElementById('personaInput').value = persona;
+  document.getElementById('modelSelect').value = model;
+}
+function closeSettings() {
+  document.getElementById('settingsOverlay').classList.remove('open');
+}
+function closeSettingsOnBg(e) {
+  if (e.target === document.getElementById('settingsOverlay')) closeSettings();
+}
+function saveSettings() {
+  apiKey  = document.getElementById('apiKeyInput').value.trim();
+  persona = document.getElementById('personaInput').value.trim() || 'You are Aura, a warm, intelligent, and concise AI assistant.';
+  model   = document.getElementById('modelSelect').value;
+  selectedVoiceName = document.getElementById('voiceSelect').value;
+  localStorage.setItem('aura_apikey', apiKey);
+  localStorage.setItem('aura_persona', persona);
+  localStorage.setItem('aura_model', model);
+  localStorage.setItem('aura_voice', selectedVoiceName);
+  closeSettings();
+  showToast('Settings saved ✓');
+}
+
+// ── Voices ────────────────────────────────────────────
+function populateVoices() {
+  const voices = window.speechSynthesis.getVoices();
+  const sel = document.getElementById('voiceSelect');
+  sel.innerHTML = '';
+  voices.forEach(v => {
+    const opt = document.createElement('option');
+    opt.value = v.name;
+    opt.textContent = `${v.name} (${v.lang})`;
+    if (v.name === selectedVoiceName) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+// ── Chat ────────────────────────────────────────────
+function clearChat() {
+  history = [];
+  const area = document.getElementById('chatArea');
+  area.innerHTML = '';
+  area.insertAdjacentHTML('beforeend', `
+    <div class="welcome" id="welcome">
+      <div class="welcome-orb"></div>
+      <h2>Hi, I'm Aura</h2>
+      <p>Your intelligent companion. Type a message or hold the mic button to talk.</p>
+    </div>`);
+}
+
+function hideWelcome() {
+  const w = document.getElementById('welcome');
+  if (w) w.remove();
+}
+
+function addMessage(role, text, isVoice = false) {
+  hideWelcome();
+  const area = document.getElementById('chatArea');
+  const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const voiceTag = isVoice ? `<div class="voice-label">🎤 via voice</div>` : '';
+  area.insertAdjacentHTML('beforeend', `
+    <div class="msg ${role}">
+      <div class="bubble">${escHtml(text)}</div>
+      ${role === 'user' && isVoice ? voiceTag : ''}
+      <div class="msg-meta">${time}</div>
+    </div>`);
+  area.scrollTop = area.scrollHeight;
+}
+
+function showTyping() {
+  hideWelcome();
+  const area = document.getElementById('chatArea');
+  area.insertAdjacentHTML('beforeend', `
+    <div class="msg ai" id="typingMsg">
+      <div class="typing-bubble">
+        <div class="dot-pulse"></div>
+        <div class="dot-pulse"></div>
+        <div class="dot-pulse"></div>
+      </div>
+    </div>`);
+  area.scrollTop = area.scrollHeight;
+}
+function removeTyping() {
+  const t = document.getElementById('typingMsg');
+  if (t) t.remove();
+}
+
+// ── AI call ────────────────────────────────────────────
+async function sendToAI(userText, isVoice = false) {
+  if (!apiKey) { showToast('⚠️ Set your Groq API key in Settings'); return; }
+  if (isLoading) return;
+  isLoading = true;
+
+  history.push({ role: 'user', content: userText });
+  addMessage('user', userText, isVoice);
+  showTyping();
+  document.getElementById('sendBtn').disabled = true;
+
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: model,
+        max_tokens: 512,
+        messages: [
+          { role: 'system', content: persona },
+          ...history.slice(-12)
+        ]
+      })
+    });
+    const data = await res.json();
+    const reply = data.choices?.[0]?.message?.content || 'Sorry, something went wrong.';
+    history.push({ role: 'assistant', content: reply });
+    removeTyping();
+    addMessage('ai', reply);
+
+    // Speak if voice or both mode
+    if (currentMode === 'voice' || currentMode === 'both') {
+      speak(reply);
+    }
+  } catch(e) {
+    removeTyping();
+    addMessage('ai', 'Connection error. Check your API key and try again.');
+  }
+
+  isLoading = false;
+  document.getElementById('sendBtn').disabled = false;
+}
+
+// ── Text input ────────────────────────────────────────────
+function handleSend() {
+  const input = document.getElementById('textInput');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  autoResize(input);
+  sendToAI(text, false);
+}
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    handleSend();
+  }
+}
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 100) + 'px';
+}
+
+// ── TTS ────────────────────────────────────────────
+function speak(text) {
+  window.speechSynthesis.cancel();
+  const utter = new SpeechSynthesisUtterance(text);
+  const voices = window.speechSynthesis.getVoices();
+  const picked = voices.find(v => v.name === selectedVoiceName) || voices.find(v => v.lang.startsWith('en')) || voices[0];
+  if (picked) utter.voice = picked;
+  utter.rate = 1.02;
+  utter.pitch = 1;
+  window.speechSynthesis.speak(utter);
+}
+
+// ── STT (Groq Whisper) ────────────────────────────────────────────
+async function startPTT(e) {
+  if (e) e.preventDefault();
+  if (isRecording) return;
+  isRecording = true;
+
+  const pttBtn  = document.getElementById('pttBtn');
+  const pttText = document.getElementById('pttText');
+  pttBtn.classList.add('recording');
+  pttText.textContent = 'Recording... release to send';
+
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaRecorder = new MediaRecorder(micStream);
+    audioChunks = [];
+    mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+    mediaRecorder.start();
+  } catch(err) {
+    showToast('⚠️ Mic access denied');
+    pttBtn.classList.remove('recording');
+    pttText.textContent = 'Hold to speak';
+    isRecording = false;
+  }
+}
+
+async function stopPTT(e) {
+  if (e) e.preventDefault();
+  if (!isRecording || !mediaRecorder) return;
+  isRecording = false;
+
+  const pttBtn  = document.getElementById('pttBtn');
+  const pttText = document.getElementById('pttText');
+  pttText.textContent = 'Transcribing...';
+
+  await new Promise(resolve => {
+    mediaRecorder.onstop = resolve;
+    mediaRecorder.stop();
+  });
+  micStream?.getTracks().forEach(t => t.stop());
+
+  const blob = new Blob(audioChunks, { type: 'audio/webm' });
+  pttBtn.classList.remove('recording');
+
+  if (!apiKey) {
+    showToast('⚠️ Set your Groq API key in Settings');
+    pttText.textContent = 'Hold to speak';
+    return;
+  }
+
+  try {
+    const formData = new FormData();
+    formData.append('file', blob, 'audio.webm');
+    formData.append('model', 'whisper-large-v3');
+    formData.append('language', 'en');
+
+    const res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${apiKey}` },
+      body: formData
+    });
+    const data = await res.json();
+    const transcript = data.text?.trim();
+
+    if (transcript) {
+      // In 'both' mode, also fill text input
+      if (currentMode === 'both') {
+        document.getElementById('textInput').value = transcript;
+        autoResize(document.getElementById('textInput'));
+      }
+      await sendToAI(transcript, true);
+    } else {
+      showToast('Could not hear anything, try again');
+    }
+  } catch(err) {
+    showToast('Transcription error, try again');
+  }
+
+  pttText.textContent = 'Hold to speak';
+}
+
+// ── Helpers ────────────────────────────────────────────
+function escHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+}
+
+function showToast(msg) {
+  const existing = document.getElementById('toast');
+  if (existing) existing.remove();
+  const toast = document.createElement('div');
+  toast.id = 'toast';
+  toast.textContent = msg;
+  Object.assign(toast.style, {
+    position:'absolute', bottom:'90px', left:'50%', transform:'translateX(-50%)',
+    background:'rgba(30,14,4,0.95)', border:'1px solid var(--glass-border)',
+    color:'var(--text)', padding:'10px 20px', borderRadius:'30px',
+    fontSize:'13px', zIndex:'100', whiteSpace:'nowrap',
+    animation:'fadeIn 0.2s', boxShadow:'0 8px 24px rgba(0,0,0,0.4)'
+  });
+  document.querySelector('.app').appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+}
+</script>
+</body>
+</html>
